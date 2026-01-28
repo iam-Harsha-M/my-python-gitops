@@ -27,16 +27,21 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       # 3. Docker Build & Push
-      - name: Login to Docker Hub
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASS }}
 
-      - name: Build and Push
-        run: |
-          docker build -t ${{ secrets.DOCKER_USER }}/python-app:${{ github.sha }} ./app
-          docker push ${{ secrets.DOCKER_USER }}/python-app:${{ github.sha }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          push: true
+          tags: ${{ secrets.DOCKER_USER }}/python-app:${{ github.sha }}
 
       # 4. GitOps: Update Manifest Image Tag
       - name: Update K8s Manifest
@@ -47,4 +52,5 @@ jobs:
           git add k8s/deployment.yaml
           git commit -m "Update image to version ${{ github.sha }} [skip ci]"
           git push
+
 
