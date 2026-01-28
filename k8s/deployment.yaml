@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: python-app
-        image: dockeruser/python-app:latest # Updated by CI
+        image: iamharsham/python-app:bc26fa6a3e162541199211e910ed953ff57995fa
         ports:
         - containerPort: 5000
         livenessProbe:
