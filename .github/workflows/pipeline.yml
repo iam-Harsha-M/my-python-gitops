@@ -7,6 +7,7 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
+      # 0. Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
@@ -33,6 +34,13 @@ jobs:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASS }}
 
+      - name: Debug Docker credentials
+        run: |
+          echo "DOCKER_USER length: ${#DOCKER_USER}"
+          echo "Full tag preview: '${{ secrets.DOCKER_USER }}/python-app:${{ github.sha }}'"
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -41,16 +49,16 @@ jobs:
         with:
           context: ./app
           push: true
-          tags: ${{ secrets.DOCKER_USER }}/python-app:${{ github.sha }}
+          tags: |
+            ${{ secrets.DOCKER_USER }}/python-app:${{ github.sha }}
+            iamharsham/python-app:${{ github.sha }}  # hardcoded backup
 
-      # 4. GitOps: Update Manifest Image Tag
+      # 4. GitOps: Update K8s Manifest
       - name: Update K8s Manifest
         run: |
-          sed -i "s|image:.*|image: ${{ secrets.DOCKER_USER }}/python-app:${{ github.sha }}|" k8s/deployment.yaml
+          sed -i "s|image:.*|image: iamharsham/python-app:${{ github.sha }}|" k8s/deployment.yaml
           git config --global user.name 'github-actions'
           git config --global user.email 'actions@github.com'
           git add k8s/deployment.yaml
-          git commit -m "Update image to version ${{ github.sha }} [skip ci]"
+          git commit -m "Update image to version ${{ github.sha }} [skip ci]" || echo "No changes to commit"
           git push
-
-
