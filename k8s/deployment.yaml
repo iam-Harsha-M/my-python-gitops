@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: python-app
-        image: iamharsham/python-app:01448ccf26610710811666d468fee3cd917b3fb4
+        image: iamharsham/python-app:fd271812b2c94f02d14280faaf3dcf7da37a19c2
         ports:
         - containerPort: 5000
         livenessProbe:
