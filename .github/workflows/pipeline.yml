@@ -27,12 +27,12 @@ jobs:
           scan-type: 'fs'
           severity: 'CRITICAL,HIGH'
 
-      # 3. Docker Build & Push (SECURITY FIX)
+      # 3. Docker Build & Push (FIXED TAGS)
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: iamharsham # HARDCODED - your secret was broken
-          password: ${{ secrets.DOCKE_PASS }}     # ← FIXED: Use token
+          password: ${{ secrets.DOCKER_PASS }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -43,18 +43,18 @@ jobs:
             iamharsham/python-app:${{ github.sha }}
             iamharsham/python-app:latest
 
-      # 4. GitOps: Update K8s Manifest (NON-FAST-FORWARD FIXED)
+      # 4. GitOps: Update K8s Manifest
       - name: Update Kubernetes Deployment
         if: github.ref == 'refs/heads/main'
-        run: |  # ← FIXED: Indentation (2 spaces)
+        run: |
           # 1. FETCH latest remote changes FIRST
           git fetch origin
           git checkout main
           git pull origin main --rebase
-          
+
           # 2. Update image tag
           sed -i "s|image:.*|image: iamharsham/python-app:${{ github.sha }}|" k8s/deployment.yaml
-          
+
           # 3. Commit & push
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
