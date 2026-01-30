@@ -13,27 +13,55 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 1. SonarQube Quality Gate
+      # 1. SonarQube Quality Gate + SLACK
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-      # 2. Trivy File System Scan (Security)
+      - name: Slack - SonarQube Failed
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#testing_files'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # 2. Trivy + SLACK  
       - name: Trivy FS Scan
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           severity: 'CRITICAL,HIGH'
 
-      # 3. Docker Build & Push (FIXED TAGS)
+      - name: Slack - Trivy Failed
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#testing_files'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # 3. Docker Login + SLACK
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: iamharsham # HARDCODED - your secret was broken
+          username: iamharsham
           password: ${{ secrets.DOCKER_PASS }}
 
+      - name: Slack - Docker Login Failed
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#testing_files'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # 4. Docker Build + SLACK
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -43,21 +71,45 @@ jobs:
             iamharsham/python-app:${{ github.sha }}
             iamharsham/python-app:latest
 
-      # 4. GitOps: Update K8s Manifest
+      - name: Slack - Docker Build Failed
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#testing_files'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # 5. GitOps + SLACK
       - name: Update Kubernetes Deployment
         if: github.ref == 'refs/heads/main'
         run: |
-          # 1. FETCH latest remote changes FIRST
           git fetch origin
           git checkout main
           git pull origin main --rebase
-
-          # 2. Update image tag
           sed -i "s|image:.*|image: iamharsham/python-app:${{ github.sha }}|" k8s/deployment.yaml
-
-          # 3. Commit & push
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add k8s/deployment.yaml
           git commit -m "chore(deploy): bump image to ${{ github.sha }} [skip ci]" || echo "No changes"
           git push origin main
+
+      - name: Slack - GitOps Failed
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#testing_files'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # 🎉 SUCCESS NOTIFICATION (NEW)
+      - name: Slack Notification - Pipeline Complete
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#testing_files'
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
