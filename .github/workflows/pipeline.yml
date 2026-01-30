@@ -27,12 +27,12 @@ jobs:
           scan-type: 'fs'
           severity: 'CRITICAL,HIGH'
 
-      # 3. Docker Build & Push (FIXED TAGS)
+      # 3. Docker Build & Push (SECURITY FIX)
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: iamharsham  # HARDCODED - your secret was broken
-          password: ${{ secrets.DOCKER_PASS }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}  # ← FIXED: Use secret
+          password: ${{ secrets.DOCKERHUB_TOKEN }}     # ← FIXED: Use token
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -43,12 +43,21 @@ jobs:
             iamharsham/python-app:${{ github.sha }}
             iamharsham/python-app:latest
 
-      # 4. GitOps: Update K8s Manifest
-      - name: Update K8s Manifest
-        run: |
+      # 4. GitOps: Update K8s Manifest (NON-FAST-FORWARD FIXED)
+      - name: Update Kubernetes Deployment
+        if: github.ref == 'refs/heads/main'
+        run: |  # ← FIXED: Indentation (2 spaces)
+          # 1. FETCH latest remote changes FIRST
+          git fetch origin
+          git checkout main
+          git pull origin main --rebase
+          
+          # 2. Update image tag
           sed -i "s|image:.*|image: iamharsham/python-app:${{ github.sha }}|" k8s/deployment.yaml
-          git config --global user.name 'github-actions'
-          git config --global user.email 'actions@github.com'
+          
+          # 3. Commit & push
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add k8s/deployment.yaml
-          git commit -m "chore: update image to ${{ github.sha }} [skip ci]" || echo "No changes"
-          git push
+          git commit -m "chore(deploy): bump image to ${{ github.sha }} [skip ci]" || echo "No changes"
+          git push origin main
